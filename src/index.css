@@ -1,25 +1,33 @@
-body {
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Roboto", "Oxygen",
-    "Ubuntu", "Cantarell", "Fira Sans", "Droid Sans", "Helvetica Neue",
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  padding: 0;
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, "Courier New",
-    monospace;
+.App {
+  font-family: sans-serif;
+  width: 100%;
+  height: 100%;
 }
 
-.quick-meet__nav {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 1;
+.quick-meet {
+  width: 100%;
+  height: 100%;
+  position: relative;
 }
 
-#quick-meet {
-  width: 100vw;
-  height: 100vh;
+.quick-meet__card {
+  position: absolute;
+  z-index: 100;
+  left: 10px;
+  top: 10px;
+  width: 400px;;
+}
+
+.quick-meet__add-address {
+  display: block !important;
+  margin-top: 20px;
 }
