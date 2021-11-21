@@ -16,3 +16,5 @@
 基于 [AMap-React](https://jimnox.gitee.io/amap-react/) ，一款由 [AMap](https://amap.com/) 官方集成了[高德地图 API](https://lbs.amap.com/api/jsapi-v2/summary/) 与 React 的地图框架，配合 UI 库 [ant design](https://ant.design/index-cn)，完成了以上构想。
 
 > 更新中……
+
+[MIT License](https://opensource.org/licenses/MIT)
