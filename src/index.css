@@ -19,12 +19,17 @@ body,
   position: relative;
 }
 
-.quick-meet__card {
+.quick-meet__card-wrap {
   position: absolute;
   z-index: 100;
   left: 10px;
   top: 10px;
-  width: 400px;;
+  width: 400px;
+}
+
+.quick-meet__card {
+  width: 100%;
+  margin-bottom: 20px !important;
 }
 
 .quick-meet__add-address {

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useRef, useState, useMemo, useEffect } from "react";
 import "./index.css";
 import "antd/dist/antd.css";
 import {
@@ -7,149 +7,124 @@ import {
 } from "@amap/amap-react";
 import {
   Card,
-  Tooltip,
   Button,
-  Modal,
-  List
+  Input,
+  message
 } from "antd";
-import SearchBox from './components/SearchBox';
-import SearchResult from './components/SearchResult';
-import SelectCity from './components/SelectCity';
 import {
-  PlusOutlined
-} from '@ant-design/icons';
-
-
+  usePlugins
+} from "@amap/amap-react";
+import SelectCurrentPlace from './components/SelectCurrentPlace';
 
 export default function App() {
   const $map = useRef(null);
-  const [mode, setMode] = useState("input");
-  const [city, setCity] = useState([]);
-  const [query, setQuery] = useState("");
+  const AMap = usePlugins(['AMap.PlaceSearch', 'AMap.GeometryUtil']);
+  const ps = useMemo(() => {
+    if (AMap)
+      return new AMap.PlaceSearch({
+        city: "上海市"
+      });
+    else return null;
+  }, [AMap]);
+  const gu = useMemo(() => {
+    if (AMap) {
+      return AMap.GeometryUtil;
+    }
+  }, [AMap])
+
   const [results, setResults] = useState([]);
   const [hover, setHover] = useState(null);
-  const [searchBoxVisible, setSearchBoxVisible] = useState(false);
   const [address, setAddress] = useState([]);
+  const [destination, setDestination] = useState('');
+  const [renderAddress, setRenderAddress] = useState([]);
+  const [disabled, setDisabled] = useState(true);
 
-  const clearSearch = () => {
-    setResults([]);
-    setHover(null);
-  };
-  const handleSearch = (query) => {
-    setQuery(query);
-  };
+  useEffect(() => {
+    if (results.length) {
+      setRenderAddress(results)
+    } else {
+      setRenderAddress(address)
+    }
+  }, [results, address])
+
+  useEffect(() => {
+    if (address.length && destination) {
+      setDisabled(false);
+    } else {
+      setDisabled(true);
+    }
+  }, [address, destination])
+
+  const startSearching = () => {
+    console.log(address);
+
+    if (address.length > 1) {
+      let distanceArr = []; // 彼此之间的距离
+
+      for (let i = 0; i < address.length; i++) {
+        address.slice(i + 1).forEach(ad => {
+          const dis = gu.distance([address[i].location.lng, address[i].location.lat], [ad.location.lng, ad.location.lat]);
+          const round = Math.round(dis);
+          distanceArr.push(round);
+        })
+      }
+      console.log(distanceArr);
+
+      const maxDistance = Math.max(distanceArr); // 获取彼此之间的最大距离
+      console.log(maxDistance);
+      address.forEach(ad => {
+        ps.searchNearBy(destination, [ad.location.lng, ad.location.lat], maxDistance, (status, result) => {
+          console.log(status, result); // 获取了各自在彼此最大距离的范围内的目标地点的数组
+          // TODO ...
+        })
+      })
+    } else {
+      message.error('请选择至少两个地址');
+    }
+  }
 
   return (
-    <div className="App">
-      <div className="quick-meet">
-        <Amap ref={$map}>
-          <Card className="quick-meet__card" title="选择你们当前的位置">
-            <SelectCity
-              city={city}
-              onCityChange={(values) => {
-                setAddress([]);
-                setCity(values);
-                $map.current.setCity(values[values.length - 1]);
-                setSearchBoxVisible(true);
-              }} />
-            {address.length > 0 &&
-              <List
-                dataSource={address}
-                locale={""}
-                renderItem={(poi) => (
-                  <List.Item style={{ cursor: "pointer" }}>
-                    <List.Item.Meta title={poi.name} description={poi.address} />
-                  </List.Item>
-                )}
-              />
-            }
-            {
-              city.length > 0 && <Tooltip title="新增地址">
-                <Button className="quick-meet__add-address" type="primary" shape="circle" icon={<PlusOutlined />}
-                  onClick={() => {
-                    setSearchBoxVisible(true);
-                  }}
-                />
-              </Tooltip>
-            }
-            <Modal visible={searchBoxVisible}
-              destroyOnClose={true}
-              onCancel={() => {
-                setSearchBoxVisible(false);
-              }}
-              footer={[
-                <Button type="primary"
-                  onClick={() => {
-                    setSearchBoxVisible(false);
-                  }}>关闭</Button>
-              ]}>
-              {mode === "input" &&
-                <SearchBox
-                  query={query}
-                  onSearch={(query) => {
-                    clearSearch();
-                    handleSearch(query);
-                    setMode("result");
-                  }}
-                  city={city}
-                />
-              }
-              {mode === "result" && (
-                <SearchResult
-                  city={city[city.length - 1]}
-                  query={query}
-                  onClose={() => {
-                    clearSearch();
-                    setMode("input");
-                  }}
-                  onResult={(results) => {
-                    setResults(results);
-                    if ($map.current) {
-                      setTimeout(() => {
-                        $map.current.setFitView(null, false, [40, 10, 310, 20]);
-                      }, 100);
-                    }
-                  }}
-                  onSelect={(poi) => {
-                    setHover(poi);
-                    setAddress(oldVal => [...oldVal, poi])
-                    setSearchBoxVisible(false);
-                    if ($map.current) {
-                      $map.current.setZoomAndCenter(
-                        17,
-                        [poi.location.lng, poi.location.lat],
-                        true
-                      );
-                    }
-                    clearSearch();
-                    setMode("input");
-                  }}
-                />
-              )}
-            </Modal>
+    <div className="quick-meet">
+      <Amap ref={$map}>
+        <div className="quick-meet__card-wrap">
+          <SelectCurrentPlace
+            $map={$map}
+            setResults={setResults}
+            address={address}
+            setAddress={setAddress}
+            hover={hover}
+            setHover={setHover}
+            ps={ps}
+          />
 
+          <Card className="quick-meet__card" title="输入你们的目标场所">
+            <Input placeholder="输入你们的目标场所" allowClear onChange={(e) => {
+              setDestination(e.target.value);
+            }} />
           </Card>
 
+          <Button type="primary" disabled={disabled} onClick={startSearching}>开始搜索</Button>
+        </div>
 
-          {results.map((poi) => (
-            <Marker
-              key={poi.id}
-              position={[poi.location.lng, poi.location.lat]}
-              label={
-                poi === hover
-                  ? {
-                    content: poi.name,
-                    direction: "bottom"
-                  }
-                  : { content: "" }
-              }
-              zIndex={poi === hover ? 110 : 100}
-              onMouseOver={() => setHover(poi)}
-              onMouseOut={() => setHover(null)}
-            />
-          ))}
-        </Amap>
-      </div>
+
+        {renderAddress.map((poi) => (
+          <Marker
+            key={poi.id}
+            position={[poi.location.lng, poi.location.lat]}
+            label={
+              poi === hover
+                ? {
+                  content: poi.name,
+                  direction: "bottom"
+                }
+                : { content: "" }
+            }
+            zIndex={poi === hover ? 110 : 100}
+            onMouseOver={() => setHover(poi)}
+            onMouseOut={() => setHover(null)}
+          />
+        ))}
+      </Amap>
     </div>
   );
 }

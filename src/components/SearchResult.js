@@ -1,24 +1,14 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Card,
   List,
   Button,
   Pagination
 } from "antd";
-import {
-  usePlugins
-} from "@amap/amap-react";
 import { noop } from '../utils/common';
 
 export default function SearchResult(props) {
-  const AMap = usePlugins(["AMap.PlaceSearch"]);
-  const ps = useMemo(() => {
-    if (AMap)
-      return new AMap.PlaceSearch({
-        city: "上海市"
-      });
-    else return null;
-  }, [AMap]);
+  const { ps } = props;
   const pageSize = 20;
   const [status, setStatus] = useState("idle");
   const [page, setPage] = useState(1);
