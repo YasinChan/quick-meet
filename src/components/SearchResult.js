@@ -1,16 +1,11 @@
-import React, { useEffect, useState } from "react";
-import {
-  Card,
-  List,
-  Button,
-  Pagination
-} from "antd";
+import React, { useEffect, useState } from 'react';
+import { Card, List, Button, Pagination } from 'antd';
 import { noop } from '../utils/common';
 
 export default function SearchResult(props) {
   const { ps } = props;
   const pageSize = 20;
-  const [status, setStatus] = useState("idle");
+  const [status, setStatus] = useState('idle');
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
   const [results, setResults] = useState([]);
@@ -26,18 +21,18 @@ export default function SearchResult(props) {
 
   useEffect(() => {
     if (!ps) return;
-    setStatus("searching");
+    setStatus('searching');
     ps.setPageSize(pageSize);
     ps.setPageIndex(page);
     ps.search(props.query, (status, result) => {
       const { onResult = noop } = props;
-      if (status === "complete" && result.poiList) {
-        setStatus("success");
+      if (status === 'complete' && result.poiList) {
+        setStatus('success');
         setResults(result.poiList.pois);
         setTotal(result.poiList.count);
         onResult(result.poiList.pois);
       } else {
-        setStatus("failed");
+        setStatus('failed');
         setResults([]);
         setTotal(0);
         onResult([]);
@@ -48,14 +43,7 @@ export default function SearchResult(props) {
   const renderPagination = () => {
     if (total <= 0) return null;
     return (
-      <Pagination
-        simple
-        size="small"
-        current={page}
-        pageSize={pageSize}
-        total={total}
-        onChange={(p) => setPage(p)}
-      />
+      <Pagination simple size="small" current={page} pageSize={pageSize} total={total} onChange={(p) => setPage(p)} />
     );
   };
 
@@ -69,22 +57,19 @@ export default function SearchResult(props) {
         </Button>
       }
       headStyle={{
-        padding: "0 12px"
+        padding: '0 12px',
       }}
       bodyStyle={{
-        maxHeight: "450px",
-        overflowY: "scroll",
-        padding: "0 12px 24px"
+        maxHeight: '450px',
+        overflowY: 'scroll',
+        padding: '0 12px 24px',
       }}
     >
       <List
         dataSource={results}
-        loading={status === "searching"}
+        loading={status === 'searching'}
         renderItem={(poi) => (
-          <List.Item
-            onClick={() => props.onSelect && props.onSelect(poi)}
-            style={{ cursor: "pointer" }}
-          >
+          <List.Item onClick={() => props.onSelect && props.onSelect(poi)} style={{ cursor: 'pointer' }}>
             <List.Item.Meta title={poi.name} description={poi.address} />
           </List.Item>
         )}

@@ -13,6 +13,7 @@
 多个当前地址根据彼此之间距离的最大值搜索周围目标点，得到数组取交集，若没有，则改为 1.5 倍距离继续搜索，最大距离为 3 倍。
 
 ## 技术方案
+
 基于 [AMap-React](https://jimnox.gitee.io/amap-react/) ，一款由 [AMap](https://amap.com/) 官方集成了[高德地图 API](https://lbs.amap.com/api/jsapi-v2/summary/) 与 React 的地图框架，配合 UI 库 [ant design](https://ant.design/index-cn)，完成了以上构想。
 
 > 更新中……
