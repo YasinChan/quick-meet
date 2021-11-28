@@ -7,6 +7,12 @@ body,
   padding: 0;
 }
 
+* {
+  padding: 0;
+  margin: 0;
+  box-sizing: border-box;
+}
+
 .App {
   font-family: sans-serif;
   width: 100%;
@@ -25,6 +31,9 @@ body,
   left: 10px;
   top: 10px;
   width: 400px;
+  max-height: calc(100vh - 50px);
+  overflow: auto;
+  background: #fff;
 }
 
 .quick-meet__card {
@@ -35,4 +44,14 @@ body,
 .quick-meet__add-address {
   display: block !important;
   margin-top: 20px;
+}
+
+.quick-meet__search-btn {
+  margin: 10px;
+}
+
+@media only screen and (max-width: 499px) {
+  .quick-meet__card-wrap {
+    width: calc(100% - 20px);
+  }
 }

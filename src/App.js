@@ -2,19 +2,43 @@ import React, { useRef, useState, useMemo, useEffect } from 'react';
 import './index.css';
 import 'antd/dist/antd.css';
 import { Amap, Marker } from '@amap/amap-react';
-import { Card, Button, Input, message } from 'antd';
+import { Button, Input, message, Collapse, List } from 'antd';
 import { usePlugins } from '@amap/amap-react';
 import SelectCurrentPlace from './components/SelectCurrentPlace';
 
 export default function App() {
+  const { Panel } = Collapse;
+  const [hover, setHover] = useState(null); // 标记的 hover
+  const [address, setAddress] = useState([]); // 选择的当前位置地址
+  const [destination, setDestination] = useState(''); // 目的地
+  const [disabled, setDisabled] = useState(true); // 开始搜索按钮的置灰
+  const [city, setCity] = useState([]); // 设置的城市
+  const [intersectionAddress, setIntersectionAddress] = useState([]); // 结果中有交集的场所
+  const [circleOverly, setCircleOverly] = useState([]); // 所有的圆形覆盖物
+  const [activeKey, setActiveKey] = useState(['1', '2', '3']); // 折叠面板中需要展开的部分
+
+  const AMap = usePlugins(['AMap.PlaceSearch', 'AMap.GeometryUtil', 'AMap.Circle', 'AMap.Transfer']);
   const $map = useRef(null);
-  const AMap = usePlugins(['AMap.PlaceSearch', 'AMap.GeometryUtil']);
+
+  // const tf = useMemo(() => {
+  //   if (AMap && $map.current) {
+  //     return new AMap.Transfer({
+  //       city: '上海市',
+  //       map: $map.current,
+  //       isOutline: false,
+  //       policy: AMap.TransferPolicy.LEAST_TIME,
+  //     });
+  //   }
+  // }, [AMap]);
   const ps = useMemo(() => {
-    if (AMap)
+    if (AMap) {
       return new AMap.PlaceSearch({
         city: '上海市',
+        pageSize: 100,
       });
-    else return null;
+    } else {
+      return null;
+    }
   }, [AMap]);
   const gu = useMemo(() => {
     if (AMap) {
@@ -22,21 +46,13 @@ export default function App() {
     }
   }, [AMap]);
 
-  const [results, setResults] = useState([]);
-  const [hover, setHover] = useState(null);
-  const [address, setAddress] = useState([]);
-  const [destination, setDestination] = useState('');
-  const [renderAddress, setRenderAddress] = useState([]);
-  const [disabled, setDisabled] = useState(true);
-
   useEffect(() => {
-    if (results.length) {
-      setRenderAddress(results);
-    } else {
-      setRenderAddress(address);
+    if ($map.current) {
+      setTimeout(() => {
+        $map.current.setFitView(null, false, [40, 10, 310, 20]);
+      }, 100);
     }
-  }, [results, address]);
-
+  }, [address]);
   useEffect(() => {
     if (address.length && destination) {
       setDisabled(false);
@@ -46,8 +62,9 @@ export default function App() {
   }, [address, destination]);
 
   const startSearching = () => {
-    console.log(address);
-
+    $map.current.remove(circleOverly); // 开始搜索时，情况所有圆形的覆盖物
+    setCircleOverly([]);
+    setIntersectionAddress([]);
     if (address.length > 1) {
       let distanceArr = []; // 彼此之间的距离
 
@@ -61,51 +78,124 @@ export default function App() {
           distanceArr.push(round);
         });
       }
-      console.log(distanceArr);
 
-      const maxDistance = Math.max(distanceArr); // 获取彼此之间的最大距离
-      console.log(maxDistance);
-      address.forEach((ad) => {
-        ps.searchNearBy(destination, [ad.location.lng, ad.location.lat], maxDistance, (status, result) => {
-          console.log(status, result); // 获取了各自在彼此最大距离的范围内的目标地点的数组
-          // TODO ...
+      const maxDistance = Math.max(...distanceArr); // 获取彼此之间的最大距离
+      const promiseArr = [];
+      ps.setPageSize(100); // 设置在开始搜索时的搜索量
+      address.forEach((ad, index) => {
+        promiseArr.push(
+          new Promise((res, rej) => {
+            ps.searchNearBy(destination, [ad.location.lng, ad.location.lat], maxDistance, (status, result) => {
+              res({ result: result.poiList ? result.poiList.pois : [], address: ad });
+            });
+          }),
+        );
+      });
+      Promise.all(promiseArr).then((res) => {
+        let poisInfo = [];
+        res.forEach((r) => {
+          const { result, address } = r;
+          let circle = new AMap.Circle({
+            center: [address.location.lng, address.location.lat], // 圆心位置
+            radius: maxDistance, // 圆半径
+            fillColor: '#1791fc', // 圆形填充颜色
+            fillOpacity: 0.4,
+            strokeColor: '#fff', // 描边颜色
+            strokeWeight: 1, // 描边宽度
+          });
+          $map.current.add(circle);
+          setCircleOverly((oldArray) => [...oldArray, circle]);
+
+          if (poisInfo.length) {
+            poisInfo = poisInfo.filter((n) => result.some((p) => p.id === n.id));
+          } else {
+            poisInfo = result;
+          }
         });
+        setIntersectionAddress(poisInfo);
+        setTimeout(() => {
+          $map.current.setFitView(null, false, [40, 10, 310, 20]);
+        }, 100);
       });
     } else {
       message.error('请选择至少两个地址');
     }
   };
+  let tfArr = [];
 
   return (
     <div className="quick-meet">
       <Amap ref={$map}>
         <div className="quick-meet__card-wrap">
-          <SelectCurrentPlace
-            $map={$map}
-            setResults={setResults}
-            address={address}
-            setAddress={setAddress}
-            hover={hover}
-            setHover={setHover}
-            ps={ps}
-          />
+          <Collapse bordered={false} defaultActiveKey={activeKey}>
+            <Panel header="选择你们当前的位置" key="1">
+              <SelectCurrentPlace
+                $map={$map}
+                address={address}
+                city={city}
+                setCity={setCity}
+                setIntersectionAddress={setIntersectionAddress}
+                setAddress={setAddress}
+                hover={hover}
+                setHover={setHover}
+                ps={ps}
+              />
+            </Panel>
+            <Panel header="输入你们的目标场所" key="2">
+              <Input
+                placeholder="输入你们的目标场所"
+                allowClear
+                onChange={(e) => {
+                  setDestination(e.target.value);
+                }}
+              />
+            </Panel>
 
-          <Card className="quick-meet__card" title="输入你们的目标场所">
-            <Input
-              placeholder="输入你们的目标场所"
-              allowClear
-              onChange={(e) => {
-                setDestination(e.target.value);
-              }}
-            />
-          </Card>
+            {intersectionAddress.length && (
+              <Panel header="搜索结果" key="3">
+                <List
+                  dataSource={intersectionAddress}
+                  locale={''}
+                  renderItem={(poi) => (
+                    <List.Item style={{ cursor: 'pointer' }}>
+                      <List.Item.Meta
+                        onMouseOver={() => setHover(poi)}
+                        onMouseOut={() => setHover(null)}
+                        title={poi.name}
+                        description={poi.address}
+                      />
+                    </List.Item>
+                  )}
+                />
+              </Panel>
+            )}
+          </Collapse>
 
-          <Button type="primary" disabled={disabled} onClick={startSearching}>
+          <Button className="quick-meet__search-btn" type="primary" disabled={disabled} onClick={startSearching}>
             开始搜索
           </Button>
         </div>
 
-        {renderAddress.map((poi) => (
+        {address.map((poi) => (
+          <Marker
+            icon="https://webapi.amap.com/theme/v1.3/markers/n/mark_r.png"
+            key={poi.id}
+            position={[poi.location.lng, poi.location.lat]}
+            label={
+              poi === hover
+                ? {
+                    content: poi.name,
+                    direction: 'bottom',
+                  }
+                : { content: '' }
+            }
+            zIndex={poi === hover ? 110 : 100}
+            onMouseOver={() => setHover(poi)}
+            onMouseOut={() => setHover(null)}
+          />
+        ))}
+
+        {intersectionAddress.map((poi) => (
           <Marker
             key={poi.id}
             position={[poi.location.lng, poi.location.lat]}
@@ -120,6 +210,27 @@ export default function App() {
             zIndex={poi === hover ? 110 : 100}
             onMouseOver={() => setHover(poi)}
             onMouseOut={() => setHover(null)}
+            onClick={(e) => {
+              if (tfArr.length) {
+                tfArr.forEach((t) => {
+                  t.clear();
+                });
+                tfArr = [];
+              }
+              address.forEach((ad) => {
+                const tf = new AMap.Transfer({
+                  city: '上海市',
+                  map: $map.current,
+                  isOutline: false,
+                  autoFitView: false,
+                  policy: AMap.TransferPolicy.LEAST_TIME,
+                });
+                tf.search([ad.location.lng, ad.location.lat], e._position, (status, result) => {
+                  console.log('----------', 'status, result', status, result, '----------cyy log');
+                });
+                tfArr.push(tf);
+              });
+            }}
           />
         ))}
       </Amap>

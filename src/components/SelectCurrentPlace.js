@@ -6,15 +6,13 @@ import SelectCity from './SelectCity';
 import { PlusOutlined } from '@ant-design/icons';
 
 export default function SelectCurrentPlace(props) {
-  const { $map, setResults, ps, setHover, address, setAddress } = props;
+  const { $map, ps, setHover, address, setAddress, city, setCity, setIntersectionAddress } = props;
 
   const [mode, setMode] = useState('input');
-  const [city, setCity] = useState([]);
   const [query, setQuery] = useState('');
   const [searchBoxVisible, setSearchBoxVisible] = useState(false);
 
   const clearSearch = () => {
-    setResults([]);
     setHover(null);
   };
 
@@ -23,12 +21,13 @@ export default function SelectCurrentPlace(props) {
   };
 
   return (
-    <Card className="quick-meet__card" title="选择你们当前的位置">
+    <>
       <SelectCity
         city={city}
         onCityChange={(values) => {
           setAddress([]);
           setCity(values);
+          setIntersectionAddress([]);
           $map.current.setCity(values[values.length - 1]);
           setSearchBoxVisible(true);
         }}
@@ -38,7 +37,19 @@ export default function SelectCurrentPlace(props) {
           dataSource={address}
           locale={''}
           renderItem={(poi) => (
-            <List.Item style={{ cursor: 'pointer' }}>
+            <List.Item
+              style={{ cursor: 'pointer' }}
+              actions={[
+                <a
+                  onClick={() => {
+                    const addressFilter = address.filter((ad) => ad.id !== poi.id);
+                    setAddress(addressFilter);
+                  }}
+                >
+                  删除
+                </a>,
+              ]}
+            >
               <List.Item.Meta title={poi.name} description={poi.address} />
             </List.Item>
           )}
@@ -52,6 +63,7 @@ export default function SelectCurrentPlace(props) {
             shape="circle"
             icon={<PlusOutlined />}
             onClick={() => {
+              setIntersectionAddress([]);
               setSearchBoxVisible(true);
             }}
           />
@@ -60,6 +72,7 @@ export default function SelectCurrentPlace(props) {
       <Modal
         visible={searchBoxVisible}
         destroyOnClose={true}
+        title="选择地址"
         onCancel={() => {
           setSearchBoxVisible(false);
         }}
@@ -94,14 +107,6 @@ export default function SelectCurrentPlace(props) {
               clearSearch();
               setMode('input');
             }}
-            onResult={(results) => {
-              setResults(results);
-              if ($map.current) {
-                setTimeout(() => {
-                  $map.current.setFitView(null, false, [40, 10, 310, 20]);
-                }, 100);
-              }
-            }}
             onSelect={(poi) => {
               setHover(poi);
               setAddress((oldVal) => [...oldVal, poi]);
@@ -115,6 +120,6 @@ export default function SelectCurrentPlace(props) {
           />
         )}
       </Modal>
-    </Card>
+    </>
   );
 }

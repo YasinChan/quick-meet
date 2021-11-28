@@ -28,7 +28,7 @@ export default function SearchBox(props) {
     });
   };
 
-  const onSelect = (value) => {
+  const onSelect = (value, a) => {
     const { onSearch = noop } = props;
     onSearch(value);
   };
@@ -37,6 +37,7 @@ export default function SearchBox(props) {
     <div className="quick-meet__search-box">
       <Input.Group compact>
         <AutoComplete
+          style={{ width: '100%' }}
           defaultValue={props.query}
           options={options.map((value) => ({
             value,
@@ -45,7 +46,7 @@ export default function SearchBox(props) {
           onSelect={onSelect}
           onSearch={handleSearch}
         >
-          <Input.Search placeholder="输入“海底捞”试试" enterButton onSearch={onSelect} />
+          <Input placeholder="输入地址" allowClear onPressEnter={onSelect} />
         </AutoComplete>
       </Input.Group>
     </div>
