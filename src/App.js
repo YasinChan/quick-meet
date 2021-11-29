@@ -8,6 +8,7 @@ import SelectCurrentPlace from './components/SelectCurrentPlace';
 
 export default function App() {
   const { Panel } = Collapse;
+
   const [hover, setHover] = useState(null); // 标记的 hover
   const [address, setAddress] = useState([]); // 选择的当前位置地址
   const [destination, setDestination] = useState(''); // 目的地
@@ -31,6 +32,7 @@ export default function App() {
   //   }
   // }, [AMap]);
   const ps = useMemo(() => {
+    // 搜索
     if (AMap) {
       return new AMap.PlaceSearch({
         city: '上海市',
@@ -41,6 +43,7 @@ export default function App() {
     }
   }, [AMap]);
   const gu = useMemo(() => {
+    // 高德地图提供的函数方法
     if (AMap) {
       return AMap.GeometryUtil;
     }
@@ -62,9 +65,9 @@ export default function App() {
   }, [address, destination]);
 
   const startSearching = () => {
-    $map.current.remove(circleOverly); // 开始搜索时，情况所有圆形的覆盖物
+    $map.current.remove(circleOverly); // 开始搜索时，清空所有圆形的覆盖物
     setCircleOverly([]);
-    setIntersectionAddress([]);
+    setIntersectionAddress([]); // 交集也清空
     if (address.length > 1) {
       let distanceArr = []; // 彼此之间的距离
 
@@ -80,7 +83,7 @@ export default function App() {
       }
 
       const maxDistance = Math.max(...distanceArr); // 获取彼此之间的最大距离
-      const promiseArr = [];
+      const promiseArr = []; // 由于搜索是异步的，所以需要在全部搜索完成后进行后续操作
       ps.setPageSize(100); // 设置在开始搜索时的搜索量
       address.forEach((ad, index) => {
         promiseArr.push(
@@ -94,6 +97,7 @@ export default function App() {
       Promise.all(promiseArr).then((res) => {
         let poisInfo = [];
         res.forEach((r) => {
+          // 各个用户到目标场所的路径取交集，最终在页面上呈现的即都在圆的交集处。
           const { result, address } = r;
           let circle = new AMap.Circle({
             center: [address.location.lng, address.location.lat], // 圆心位置
@@ -122,6 +126,8 @@ export default function App() {
     }
   };
   let tfArr = [];
+  // 点击目标场所的标识按钮需要各个用户当前位置到标识处的路径信息，
+  // 但发现 AMap.Transfer 方法一个实例只能绘制一条路径，所以需要多个实例，同时用完即销毁。
 
   return (
     <div className="quick-meet">
