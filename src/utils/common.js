@@ -53,3 +53,10 @@ export function loadCities() {
   }
   return _citiesPromise;
 }
+
+export function secondToDate(result) {
+  const h = Math.floor(result / 3600);
+  const m = Math.floor((result / 60) % 60);
+  const s = Math.floor(result % 60);
+  return (h && h + '小时') + (m && m + '分钟') + s + '秒';
+}
