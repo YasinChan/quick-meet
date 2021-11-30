@@ -4,7 +4,7 @@ import './index.css';
 import App from './App';
 import { config as AmapReactConfig } from '@amap/amap-react';
 
-AmapReactConfig.key = '8331532e931a9af572b0409028801e6b';
+AmapReactConfig.key = process.env.REACT_APP_AMAP_WEB_KEY;
 
 ReactDOM.render(
   <React.StrictMode>

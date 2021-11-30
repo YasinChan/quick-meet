@@ -7,6 +7,7 @@ import { usePlugins } from '@amap/amap-react';
 import SelectCurrentPlace from './components/SelectCurrentPlace';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import marker1 from './marker-1.svg';
+import queryString from 'query-string';
 
 // 点击目标场所的标识按钮需要各个用户当前位置到标识处的路径信息，
 // 但发现 AMap.Transfer 方法一个实例只能绘制一条路径，所以需要多个实例，同时用完即销毁。
@@ -15,8 +16,9 @@ export default function App() {
   const { Panel } = Collapse;
   const { Option } = Select;
 
-  const [infoPopover, setInfoPopover] = useState(false); // 标记的 hover
-  const [distanceRatio, setDistanceRatio] = useState(1); // 标记的 hover
+  const [infoPopover, setInfoPopover] = useState(false); // 选择范围倍数的 info
+  const [distanceRatio, setDistanceRatio] = useState(1); // 选择范围倍数的
+  const [policy, setPolicy] = useState(0); // 公交换乘策略 map
 
   const [hover, setHover] = useState(null); // 标记的 hover
   const [address, setAddress] = useState([]); // 选择的当前位置地址
@@ -27,7 +29,6 @@ export default function App() {
   const [circleOverly, setCircleOverly] = useState([]); // 所有的圆形覆盖物
   const [activeKey, setActiveKey] = useState(['1']); // 折叠面板中需要展开的部分
   const [transferPolicy, setTransferPolicy] = useState([]); // 公交换乘策略 map
-  const [policy, setPolicy] = useState(0); // 公交换乘策略 map
 
   const AMap = usePlugins(['AMap.PlaceSearch', 'AMap.GeometryUtil', 'AMap.Circle', 'AMap.Transfer']);
   const $map = useRef(null);
@@ -89,6 +90,39 @@ export default function App() {
           value: AMap.TransferPolicy.NO_SUBWAY,
         },
       ]);
+
+      const search = window.location.search;
+      const parsed = queryString.parse(search, { arrayFormat: 'bracket' });
+
+      const {
+        city: cityM,
+        addressId: addressIdM,
+        destination: destinationM,
+        distanceRatio: distanceRatioM,
+        policy: policyM,
+      } = parsed;
+      if (cityM && addressIdM) {
+        setCity(cityM);
+        const pArr = [];
+        addressIdM.split(',').forEach((addId) => {
+          pArr.push(
+            new Promise((res, rej) => {
+              ps.getDetails(addId, (status, result) => {
+                if (status === 'complete') {
+                  res(result.poiList.pois[0]);
+                }
+              });
+            }),
+          );
+        });
+        Promise.all(pArr).then((res) => {
+          setAddress(res);
+          setDestination(destinationM);
+          setDistanceRatio(Number(distanceRatioM));
+          setPolicy(policyM);
+          message.success('请确认信息后点击开始搜索');
+        });
+      }
     }
   }, [AMap]);
 
@@ -112,9 +146,12 @@ export default function App() {
     setCircleOverly([]);
     setIntersectionAddress([]); // 交集也清空
     if (address.length > 1) {
+      const addressIdArr = [];
+
       let distanceArr = []; // 彼此之间的距离
 
       for (let i = 0; i < address.length; i++) {
+        addressIdArr.push(address[i].id);
         address.slice(i + 1).forEach((ad) => {
           const dis = gu.distance(
             [address[i].location.lng, address[i].location.lat],
@@ -124,6 +161,8 @@ export default function App() {
           distanceArr.push(round);
         });
       }
+
+      const addressIdArrValue = addressIdArr.join(',');
 
       const maxDistance = Math.max(...distanceArr); // 获取彼此之间的最大距离
       const promiseArr = []; // 由于搜索是异步的，所以需要在全部搜索完成后进行后续操作
@@ -143,6 +182,22 @@ export default function App() {
         );
       });
       Promise.all(promiseArr).then((res) => {
+        const url = queryString.stringifyUrl(
+          {
+            url: window.location.pathname,
+            query: {
+              city,
+              policy,
+              destination,
+              distanceRatio,
+              addressId: addressIdArrValue,
+            },
+          },
+          { arrayFormat: 'bracket' },
+        );
+
+        window.history.replaceState({ url: url, title: document.title }, document.title, url);
+
         let poisInfo = [];
         res.forEach((r) => {
           // 各个用户到目标场所的路径取交集，最终在页面上呈现的即都在圆的交集处。
@@ -204,7 +259,11 @@ export default function App() {
       <Amap ref={$map}>
         <div className="quick-meet__card-wrap">
           <Collapse bordered={false} defaultActiveKey={activeKey}>
-            <Panel header="Quick Meet" key="1">
+            <Panel
+              className="quick-meet__collapse-panel"
+              header={<span className="quick-meet__collapse-panel-title">Quick Meet</span>}
+              key="1"
+            >
               <Card className="quick-meet__card" title="选择你们当前的位置" bordered={false}>
                 <SelectCurrentPlace
                   $map={$map}
@@ -223,6 +282,7 @@ export default function App() {
                 <Input
                   placeholder="输入你们的目标场所"
                   allowClear
+                  value={destination}
                   onChange={(e) => {
                     setDestination(e.target.value);
                   }}
