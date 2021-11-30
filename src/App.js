@@ -6,6 +6,7 @@ import { Button, Input, message, Collapse, List, Slider, Row, Col, Card, Popover
 import { usePlugins } from '@amap/amap-react';
 import SelectCurrentPlace from './components/SelectCurrentPlace';
 import { QuestionCircleOutlined } from '@ant-design/icons';
+import marker1 from './marker-1.svg';
 
 // 点击目标场所的标识按钮需要各个用户当前位置到标识处的路径信息，
 // 但发现 AMap.Transfer 方法一个实例只能绘制一条路径，所以需要多个实例，同时用完即销毁。
@@ -312,7 +313,6 @@ export default function App() {
 
         {address.map((poi) => (
           <Marker
-            icon="https://webapi.amap.com/theme/v1.3/markers/n/mark_r.png"
             key={poi.id}
             position={[poi.location.lng, poi.location.lat]}
             label={
@@ -331,6 +331,8 @@ export default function App() {
 
         {intersectionAddress.map((poi) => (
           <Marker
+            icon={marker1}
+            offset={[-22, -40]}
             key={poi.id}
             position={[poi.location.lng, poi.location.lat]}
             label={
