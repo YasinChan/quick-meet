@@ -7,6 +7,7 @@ import { usePlugins } from '@amap/amap-react';
 import SelectCurrentPlace from './components/SelectCurrentPlace';
 import { QuestionCircleOutlined } from '@ant-design/icons';
 import marker1 from './marker-1.svg';
+import marker2 from './marker-2.svg';
 import queryString from 'query-string';
 
 // 点击目标场所的标识按钮需要各个用户当前位置到标识处的路径信息，
@@ -48,7 +49,8 @@ export default function App() {
     if (AMap) {
       return new AMap.PlaceSearch({
         city: '上海市',
-        pageSize: 100,
+        pageSize: 50,
+        citylimit: true,
       });
     } else {
       return null;
@@ -141,6 +143,8 @@ export default function App() {
     }
   }, [address, destination]);
 
+  const [a, setA] = useState([]);
+
   const startSearching = () => {
     $map.current.remove(circleOverly); // 开始搜索时，清空所有圆形的覆盖物
     setCircleOverly([]);
@@ -166,22 +170,49 @@ export default function App() {
 
       const maxDistance = Math.max(...distanceArr); // 获取彼此之间的最大距离
       const promiseArr = []; // 由于搜索是异步的，所以需要在全部搜索完成后进行后续操作
-      ps.setPageSize(100); // 设置在开始搜索时的搜索量
+
+      // PlaceSearch 的 searchNearBy 方法一次只能搜索一页最多 50 条数据，这里有可能会有大于 50 条，所以这里使用递归查询所有地点
+      // TODO 设置一个最大页数，避免特别多的值导致搜索结果太大。
+      function searchNearBy(destination, ad, distance, pageIndex = 1, arr = []) {
+        // 这里要设置 pageIndex，所以需要每个是单独实例避免污染。
+        let ap = new AMap.PlaceSearch({
+          city: city,
+          pageSize: 50,
+          citylimit: true,
+        });
+        return new Promise((res) => {
+          ap.setPageIndex(pageIndex);
+          ap.searchNearBy(destination, [ad.location.lng, ad.location.lat], distance, (status, result) => {
+            if (status === 'complete') {
+              const poiList = result.poiList;
+              if (poiList.count > poiList.pageIndex * poiList.pageSize) {
+                arr.push(...poiList.pois);
+                res(searchNearBy(destination, ad, distance, poiList.pageIndex + 1, arr));
+              } else {
+                arr.push(...poiList.pois);
+                res(arr);
+              }
+            } else {
+              res(arr);
+            }
+          });
+        });
+      }
+
       address.forEach((ad, index) => {
         promiseArr.push(
           new Promise((res, rej) => {
-            ps.searchNearBy(
-              destination,
-              [ad.location.lng, ad.location.lat],
-              maxDistance * distanceRatio,
-              (status, result) => {
-                res({ result: result.poiList ? result.poiList.pois : [], address: ad });
-              },
-            );
+            searchNearBy(destination, ad, maxDistance * distanceRatio, 1, []).then((r) => {
+              if (r && r.length) {
+                res({ result: r, address: ad });
+              }
+            });
           }),
         );
       });
+
       Promise.all(promiseArr).then((res) => {
+        debugger;
         const url = queryString.stringifyUrl(
           {
             url: window.location.pathname,
@@ -213,12 +244,14 @@ export default function App() {
           $map.current.add(circle);
           setCircleOverly((oldArray) => [...oldArray, circle]);
 
+          setA((o) => [...o, ...result]);
           if (poisInfo.length) {
             poisInfo = poisInfo.filter((n) => result.some((p) => p.id === n.id));
           } else {
             poisInfo = result;
           }
         });
+
         setIntersectionAddress(poisInfo);
         setTimeout(() => {
           $map.current.setFitView(null, false, [40, 10, 310, 20]);
@@ -228,6 +261,10 @@ export default function App() {
       message.error('请选择至少两个地址');
     }
   };
+
+  useEffect(() => {
+    console.log('a', a);
+  }, [a]);
 
   const setPath = useCallback(
     (poi) => {
@@ -373,8 +410,31 @@ export default function App() {
 
         {address.map((poi) => (
           <Marker
+            icon={marker2}
+            offset={[-22, -40]}
             key={poi.id}
             position={[poi.location.lng, poi.location.lat]}
+            label={
+              poi === hover
+                ? {
+                    content: poi.name,
+                    direction: 'bottom',
+                  }
+                : { content: '' }
+            }
+            zIndex={poi === hover ? 110 : 100}
+            onMouseOver={() => setHover(poi)}
+            onMouseOut={() => setHover(null)}
+          />
+        ))}
+
+        {a.map((poi) => (
+          <Marker
+            key={poi.id}
+            position={[poi.location.lng, poi.location.lat]}
+            style={{ opacity: '0.4' }}
+            className="aaaaaa"
+            children={<img width="19px" height="32px" src="//webapi.amap.com/theme/v1.3/markers/b/mark_bs.png" />}
             label={
               poi === hover
                 ? {
