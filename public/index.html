@@ -22,8 +22,6 @@
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
     <title>Quick Meet</title>
-    <!--    <script type="text/javascript" src="//webapi.amap.com/maps?v=1.4.15&key=8331532e931a9af572b0409028801e6b"></script>-->
-    <!--    <script type="text/javascript" src="//webapi.amap.com/ui/1.1/main.js"></script>-->
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
@@ -38,5 +36,10 @@
       To begin the development, run `npm start` or `yarn start`.
       To create a production bundle, use `npm run build` or `yarn build`.
     -->
+    <script type="text/javascript">
+    window._AMapSecurityConfig = {
+      serviceHost: "%REACT_APP_AMAP_SECRET_PATH%",
+    }
+    </script>
   </body>
 </html>
