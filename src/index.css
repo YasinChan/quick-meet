@@ -38,14 +38,31 @@ body,
   max-height: calc(100vh - 50px);
   overflow: auto;
   background: #fff;
+  padding-top:50px;
 }
 .quick-meet__card-header {
-  padding: 12px 24px;
   border-bottom: 2px solid rgba(0,0,0,0.2);
   display: flex;
   align-items: center;
   cursor: pointer;
   justify-content: space-between;
+  position: fixed;
+  width: 400px;
+  max-height: calc(100vh - 50px);
+  z-index: 1;
+  background: #fff;
+  padding: 0 24px;
+  height: 50px;
+  top: 10px;
+  left: 10px;
+}
+.quick-meet__card-header-tip {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: 50px;
+  font-size: 12px;
+  color: rgba(0, 0, 0, 0.2)
 }
 .quick-meet__card-header--active .quick-meet__card-header-icon {
   transform: rotate(0deg);
@@ -96,7 +113,7 @@ body,
 }
 
 @media only screen and (max-width: 499px) {
-  .quick-meet__card-wrap {
-    width: calc(100% - 50px);
+  .quick-meet__card-wrap, .quick-meet__card-header {
+    width: calc(100% - 20px);
   }
 }

@@ -19,7 +19,7 @@ import {
 } from 'antd';
 import { usePlugins } from '@amap/amap-react';
 import SelectCurrentPlace from './components/SelectCurrentPlace';
-import { QuestionCircleOutlined, RightOutlined, InfoCircleOutlined } from '@ant-design/icons';
+import { QuestionCircleOutlined, RightOutlined, InfoCircleOutlined, CopyOutlined } from '@ant-design/icons';
 import marker1 from './marker-1.svg';
 import marker2 from './marker-2.svg';
 import queryString from 'query-string';
@@ -27,6 +27,7 @@ import { listDeDuplication, secondToDate } from './utils/common';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import IntersectionAddressFunc from './components/IntersectionAddressFuc';
 
+const MAX_SEARCH_PAGE = 3; // 最大搜索页数。searchNearBy 方法一次只能搜索一页最多 50 条数据，这里设置最大页数，防止加载太多。
 // 点击目标场所的标识按钮需要各个用户当前位置到标识处的路径信息，
 // 但发现 AMap.Transfer 方法一个实例只能绘制一条路径，所以需要多个实例，同时用完即销毁。
 let tfArr = [];
@@ -180,13 +181,17 @@ export default function App() {
   const copySuccessNotification = () => {
     notification.open({
       message: '提示',
-      description: '分享链接已复制！',
-      duration: 10,
+      description: '已复制！',
+      duration: 2,
       icon: <InfoCircleOutlined style={{ color: '#108ee9' }} />,
     });
   };
 
   const startSearching = () => {
+    tfArr.forEach((t) => {
+      t.clear();
+    });
+    tfArr = [];
     setIsLoading(true);
     $map.current.remove(circleOverly); // 开始搜索时，清空所有圆形的覆盖物
     setCircleOverly([]);
@@ -214,7 +219,6 @@ export default function App() {
       const promiseArr = []; // 由于搜索是异步的，所以需要在全部搜索完成后进行后续操作
 
       // PlaceSearch 的 searchNearBy 方法一次只能搜索一页最多 50 条数据，这里有可能会有大于 50 条，所以这里使用递归查询所有地点
-      // TODO 设置一个最大页数，避免特别多的值导致搜索结果太大。
       function searchNearBy(destination, ad, distance, pageIndex = 1, arr = []) {
         // 这里要设置 pageIndex，所以需要每个是单独实例避免污染。
         let ap = new AMap.PlaceSearch({
@@ -229,7 +233,18 @@ export default function App() {
               const poiList = result.poiList;
               if (poiList.count > poiList.pageIndex * poiList.pageSize) {
                 arr.push(...poiList.pois);
-                res(searchNearBy(destination, ad, distance, poiList.pageIndex + 1, arr));
+                if (poiList.pageIndex >= MAX_SEARCH_PAGE) {
+                  notification.open({
+                    message: '提示',
+                    duration: 10,
+                    description: '目标场所的搜索结果过多，仅能展示部分结果，请填写更加详细的目标名称或缩小搜索范围。',
+                    icon: <InfoCircleOutlined style={{ color: '#108ee9' }} />,
+                    placement: 'bottomRight',
+                  });
+                  res(arr);
+                } else {
+                  res(searchNearBy(destination, ad, distance, poiList.pageIndex + 1, arr));
+                }
               } else {
                 arr.push(...poiList.pois);
                 res(arr);
@@ -373,6 +388,7 @@ export default function App() {
             }}
           >
             <RightOutlined className="quick-meet__card-header-icon" />
+            <span className="quick-meet__card-header-tip">{isHeaderActive ? '点击收起' : '点击展开'}</span>
             <span className="quick-meet__card-header-title">Quick Meet</span>
             <InfoCircleOutlined
               style={{ marginLeft: '10px', fontSize: '18px' }}
@@ -466,7 +482,7 @@ export default function App() {
                 <QuestionCircleOutlined style={{ marginLeft: '5px' }} />
               </Popover>
             </Col>
-            <Col span={12}>
+            <Col span={10}>
               <Slider
                 min={1}
                 max={2}
@@ -477,12 +493,12 @@ export default function App() {
                 }}
               />
             </Col>
-            <Col span={4}>{distanceRatio} 倍</Col>
+            <Col span={6}>{distanceRatio} 倍</Col>
           </Row>
 
           <Row align="middle" className="quick-meet__row">
             <Col span={8}>是否展示所有搜索到的地址</Col>
-            <Col span={12}>
+            <Col span={10}>
               <Switch
                 checkedChildren="开启"
                 unCheckedChildren="关闭"
@@ -507,8 +523,8 @@ export default function App() {
 
           {intersectionAddress.length > 0 && (
             <Row align="middle" className="quick-meet__row">
-              <Col span={8}>选择公交换乘策略</Col>
-              <Col span={8}>
+              <Col span={6}>选择公交换乘策略</Col>
+              <Col span={10}>
                 {transferPolicy.length > 0 && (
                   <Select
                     defaultValue={transferPolicy[0].value}
@@ -601,9 +617,14 @@ export default function App() {
         ]}
       >
         <div>
-          目的地：<span>{currentSelectAddress}</span>
+          目的地：<span style={{ fontWeight: 'bold' }}>{currentSelectAddress}</span>
+          <CopyToClipboard text={currentSelectAddress} onCopy={copySuccessNotification}>
+            <CopyOutlined style={{ marginLeft: '8px', color: 'rgba(0,0,0,0.4)' }} />
+          </CopyToClipboard>
         </div>
-        <div>当前公交换乘策略：{policyTitle}</div>
+        <div>
+          当前公交换乘策略：<span style={{ fontWeight: 'bold' }}>{policyTitle}</span>
+        </div>
 
         {currentRoutePlan.length > 0 && (
           <List
@@ -633,15 +654,17 @@ export default function App() {
                   }
                   description={
                     <div className="quick-meet__route-plan-result">
-                      {routePlan.result && routePlan.result.plans && (
+                      {routePlan.result && routePlan.result.plans && routePlan.result.plans[0] && (
                         <div className="quick-meet__route-plan-taxi-cost">
-                          公交花费大约：￥{routePlan.result.plans[0].cost}，
-                          {secondToDate(routePlan.result.plans[0].time)}
+                          公交花费大约：
+                          <span style={{ fontWeight: 'bold' }}>
+                            ￥{routePlan.result.plans[0].cost}, {secondToDate(routePlan.result.plans[0].time)}
+                          </span>
                         </div>
                       )}
-                      {routePlan.result && (
+                      {routePlan.result && routePlan.result.taxi_cost && (
                         <div className="quick-meet__route-plan-taxi-cost">
-                          打车花费大约：￥{routePlan.result.taxi_cost}
+                          打车花费大约：<span style={{ fontWeight: 'bold' }}>￥{routePlan.result.taxi_cost}</span>
                         </div>
                       )}
                     </div>

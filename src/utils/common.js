@@ -55,6 +55,9 @@ export function loadCities() {
 }
 
 export function secondToDate(result) {
+  if (!result) {
+    return '';
+  }
   const h = Math.floor(result / 3600);
   const m = Math.floor((result / 60) % 60);
   return (h ? h + '小时' : '') + (m && m + '分钟');
