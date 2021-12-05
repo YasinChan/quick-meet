@@ -57,6 +57,15 @@ export function loadCities() {
 export function secondToDate(result) {
   const h = Math.floor(result / 3600);
   const m = Math.floor((result / 60) % 60);
-  const s = Math.floor(result % 60);
-  return (h && h + '小时') + (m && m + '分钟') + s + '秒';
+  return (h ? h + '小时' : '') + (m && m + '分钟');
 }
+
+export const listDeDuplication = (preList, nextList, key) => {
+  let identificationMap = new Map();
+  preList.map((preItem) => {
+    preItem[key] && identificationMap.set(preItem[key], true);
+  });
+  return nextList.filter((item) => {
+    return !identificationMap.has(item[key]);
+  });
+};

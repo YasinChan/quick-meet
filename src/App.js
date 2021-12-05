@@ -2,24 +2,50 @@ import React, { useRef, useState, useMemo, useEffect, useCallback } from 'react'
 import './index.css';
 import 'antd/dist/antd.css';
 import { Amap, Marker } from '@amap/amap-react';
-import { Button, Input, message, Collapse, List, Slider, Row, Col, Card, Popover, Select } from 'antd';
+import {
+  Button,
+  Input,
+  message,
+  List,
+  Slider,
+  Row,
+  Col,
+  Card,
+  Popover,
+  Select,
+  Switch,
+  Modal,
+  notification,
+} from 'antd';
 import { usePlugins } from '@amap/amap-react';
 import SelectCurrentPlace from './components/SelectCurrentPlace';
-import { QuestionCircleOutlined } from '@ant-design/icons';
+import { QuestionCircleOutlined, RightOutlined, InfoCircleOutlined } from '@ant-design/icons';
 import marker1 from './marker-1.svg';
 import marker2 from './marker-2.svg';
 import queryString from 'query-string';
+import { listDeDuplication, secondToDate } from './utils/common';
+import { CopyToClipboard } from 'react-copy-to-clipboard';
+import IntersectionAddressFunc from './components/IntersectionAddressFuc';
 
 // 点击目标场所的标识按钮需要各个用户当前位置到标识处的路径信息，
 // 但发现 AMap.Transfer 方法一个实例只能绘制一条路径，所以需要多个实例，同时用完即销毁。
 let tfArr = [];
 export default function App() {
-  const { Panel } = Collapse;
   const { Option } = Select;
+
+  const [isLoading, setIsLoading] = useState(false); // 是否正在搜索
+  const [isHeaderActive, setIsHeaderActive] = useState(true); // 是否展开
+  const [isShowInfoModal, setIsShowInfoModal] = useState(false); //
+  const [isShowFinal, setIsShowFinal] = useState(false); //
+  const [currentSelectAddress, setCurrentSelectAddress] = useState(''); // 点击开始搜索后，点击地图标记时此处的地址
+  const [currentRoutePlan, setCurrentRoutePlan] = useState([]); // 点击开始搜索后，点击地图标记时此时的路径规划
 
   const [infoPopover, setInfoPopover] = useState(false); // 选择范围倍数的 info
   const [distanceRatio, setDistanceRatio] = useState(1); // 选择范围倍数的
-  const [policy, setPolicy] = useState(0); // 公交换乘策略 map
+  const policy = useRef(); // 公交换乘策略 value
+  // 注：这里使用 useRef 的原因在于，policy 需要在 setPath 中频繁使用，state 在 useCallback 中存在在某些情况无法更新的情况 参考：https://zhuanlan.zhihu.com/p/56975681
+  const [policyTitle, setPolicyTitle] = useState(''); // 公交换乘策略 title
+  const [isShowAllAddress, setIsShowAllAddress] = useState(false); // 是否展示所有地址
 
   const [hover, setHover] = useState(null); // 标记的 hover
   const [address, setAddress] = useState([]); // 选择的当前位置地址
@@ -34,16 +60,6 @@ export default function App() {
   const AMap = usePlugins(['AMap.PlaceSearch', 'AMap.GeometryUtil', 'AMap.Circle', 'AMap.Transfer']);
   const $map = useRef(null);
 
-  // const tf = useMemo(() => {
-  //   if (AMap && $map.current) {
-  //     return new AMap.Transfer({
-  //       city: '上海市',
-  //       map: $map.current,
-  //       isOutline: false,
-  //       policy: AMap.TransferPolicy.LEAST_TIME,
-  //     });
-  //   }
-  // }, [AMap]);
   const ps = useMemo(() => {
     // 搜索
     if (AMap) {
@@ -65,8 +81,9 @@ export default function App() {
 
   useEffect(() => {
     if (AMap) {
-      setPolicy(AMap.TransferPolicy.LEAST_TIME);
-      setTransferPolicy([
+      policy.current = AMap.TransferPolicy.LEAST_TIME;
+      setPolicyTitle('最快捷模式');
+      const tpList = [
         {
           title: '最快捷模式',
           value: AMap.TransferPolicy.LEAST_TIME,
@@ -91,20 +108,22 @@ export default function App() {
           title: '不乘地铁模式',
           value: AMap.TransferPolicy.NO_SUBWAY,
         },
-      ]);
+      ];
+      setTransferPolicy(tpList);
 
       const search = window.location.search;
-      const parsed = queryString.parse(search, { arrayFormat: 'bracket' });
+      const parsed = queryString.parse(search, { arrayFormat: 'bracket', parseBooleans: true });
 
       const {
         city: cityM,
         addressId: addressIdM,
         destination: destinationM,
         distanceRatio: distanceRatioM,
-        policy: policyM,
+        showAllAddress: showAllAddressM,
       } = parsed;
-      if (cityM && addressIdM) {
+      if (cityM && addressIdM && destinationM && distanceRatioM && typeof showAllAddressM === 'boolean') {
         setCity(cityM);
+        setIsShowAllAddress(showAllAddressM);
         const pArr = [];
         addressIdM.split(',').forEach((addId) => {
           pArr.push(
@@ -121,8 +140,11 @@ export default function App() {
           setAddress(res);
           setDestination(destinationM);
           setDistanceRatio(Number(distanceRatioM));
-          setPolicy(policyM);
-          message.success('请确认信息后点击开始搜索');
+          notification.open({
+            message: '提示',
+            description: '搜索信息已自动填入，请确认后点击“开始搜索”按钮。',
+            icon: <InfoCircleOutlined style={{ color: '#108ee9' }} />,
+          });
         });
       }
     }
@@ -142,10 +164,24 @@ export default function App() {
       setDisabled(true);
     }
   }, [address, destination]);
+  useEffect(() => {
+    if (isShowAllAddress) {
+    }
+  }, [isShowAllAddress]);
 
-  const [a, setA] = useState([]);
+  const [allAddress, setAllAddress] = useState([]); // 记录下所有搜到的地址
+
+  const copySuccessNotification = () => {
+    notification.open({
+      message: '提示',
+      description: '分享链接已复制！',
+      duration: 10,
+      icon: <InfoCircleOutlined style={{ color: '#108ee9' }} />,
+    });
+  };
 
   const startSearching = () => {
+    setIsLoading(true);
     $map.current.remove(circleOverly); // 开始搜索时，清空所有圆形的覆盖物
     setCircleOverly([]);
     setIntersectionAddress([]); // 交集也清空
@@ -212,19 +248,18 @@ export default function App() {
       });
 
       Promise.all(promiseArr).then((res) => {
-        debugger;
         const url = queryString.stringifyUrl(
           {
             url: window.location.pathname,
             query: {
               city,
-              policy,
               destination,
               distanceRatio,
+              showAllAddress: isShowAllAddress,
               addressId: addressIdArrValue,
             },
           },
-          { arrayFormat: 'bracket' },
+          { arrayFormat: 'bracket', parseBooleans: true },
         );
 
         window.history.replaceState({ url: url, title: document.title }, document.title, url);
@@ -244,7 +279,12 @@ export default function App() {
           $map.current.add(circle);
           setCircleOverly((oldArray) => [...oldArray, circle]);
 
-          setA((o) => [...o, ...result]);
+          if (isShowAllAddress) {
+            setAllAddress((o) => {
+              const list = listDeDuplication(o, result, 'id');
+              return [...o, ...list];
+            });
+          }
           if (poisInfo.length) {
             poisInfo = poisInfo.filter((n) => result.some((p) => p.id === n.id));
           } else {
@@ -254,6 +294,24 @@ export default function App() {
 
         setIntersectionAddress(poisInfo);
         setTimeout(() => {
+          setIsLoading(false);
+          setIsHeaderActive(false);
+          notification.open({
+            message: '提示',
+            duration: 10,
+            description: (
+              <span>
+                路线规划已生成，请点击地图中的<span style={{ fontWeight: 'bold' }}>绿色点标记</span>获得详细路线规划。
+                <br />
+                分享链接已生成，
+                <CopyToClipboard text={window.location.href} onCopy={copySuccessNotification}>
+                  <span style={{ color: '#108ee9', cursor: 'pointer' }}>点击</span>
+                </CopyToClipboard>
+                复制链接。
+              </span>
+            ),
+            icon: <InfoCircleOutlined style={{ color: '#108ee9' }} />,
+          });
           $map.current.setFitView(null, false, [40, 10, 310, 20]);
         }, 100);
       });
@@ -261,10 +319,6 @@ export default function App() {
       message.error('请选择至少两个地址');
     }
   };
-
-  useEffect(() => {
-    console.log('a', a);
-  }, [a]);
 
   const setPath = useCallback(
     (poi) => {
@@ -274,16 +328,27 @@ export default function App() {
         });
         tfArr = [];
       }
+      setCurrentRoutePlan([]);
       address.forEach((ad) => {
         const tf = new AMap.Transfer({
           city: '上海市',
           map: $map.current,
           isOutline: false,
           autoFitView: false,
-          policy: policy,
+          policy: policy.current,
         });
         tf.search([ad.location.lng, ad.location.lat], [poi.location.lng, poi.location.lat], (status, result) => {
-          console.log('----------', 'status, result', status, result, '----------cyy log');
+          setCurrentSelectAddress(poi.name);
+          setCurrentRoutePlan((o) => [
+            ...o,
+            {
+              start: ad,
+              end: poi,
+              result: result,
+              tf: tf,
+            },
+          ]);
+          setIsShowFinal(true);
         });
         tfArr.push(tf);
       });
@@ -295,58 +360,86 @@ export default function App() {
     <div className="quick-meet">
       <Amap ref={$map}>
         <div className="quick-meet__card-wrap">
-          <Collapse bordered={false} defaultActiveKey={activeKey}>
-            <Panel
-              className="quick-meet__collapse-panel"
-              header={<span className="quick-meet__collapse-panel-title">Quick Meet</span>}
-              key="1"
-            >
-              <Card className="quick-meet__card" title="选择你们当前的位置" bordered={false}>
-                <SelectCurrentPlace
-                  $map={$map}
-                  address={address}
-                  city={city}
-                  setCity={setCity}
-                  setIntersectionAddress={setIntersectionAddress}
-                  setAddress={setAddress}
-                  hover={hover}
-                  setHover={setHover}
-                  ps={ps}
+          <div
+            className={'quick-meet__card-header' + (isHeaderActive ? '' : ' quick-meet__card-header--active')}
+            onClick={() => {
+              setIsHeaderActive(!isHeaderActive);
+            }}
+          >
+            <RightOutlined className="quick-meet__card-header-icon" />
+            <span className="quick-meet__card-header-title">Quick Meet</span>
+            <InfoCircleOutlined
+              style={{ marginLeft: '10px', fontSize: '18px' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsShowInfoModal(true);
+              }}
+            />
+          </div>
+          <Modal
+            visible={isShowInfoModal}
+            destroyOnClose={true}
+            title="这是一个可以快速找到聚会地点的网站！"
+            onCancel={() => {
+              setIsShowInfoModal(false);
+            }}
+            footer={[]}
+          >
+            <span>你只需要输入你与你的伙伴的位置以及想要去的场所，这个网站将找到所有合适的具体位置供你们参考。</span>
+            <br />
+            <br />
+            源码请查看
+            <a href="https://github.com/YasinChan/quick-meet" target="_blank">
+              GitHub
+            </a>
+            。
+          </Modal>
+          <div className={'quick-meet__card-info ' + (isHeaderActive ? '' : 'quick-meet__card-info--active')}>
+            <Card className="quick-meet__card" title="选择你们当前的位置">
+              <SelectCurrentPlace
+                $map={$map}
+                address={address}
+                city={city}
+                setCity={setCity}
+                setIntersectionAddress={setIntersectionAddress}
+                setAddress={setAddress}
+                hover={hover}
+                setHover={setHover}
+                ps={ps}
+              />
+            </Card>
+
+            <Card className="quick-meet__card" title="输入你们的目标场所">
+              <Input
+                placeholder="输入你们的目标场所"
+                allowClear
+                value={destination}
+                onChange={(e) => {
+                  setDestination(e.target.value);
+                }}
+              />
+            </Card>
+
+            {intersectionAddress.length > 0 && (
+              <Card className="quick-meet__card" title="搜索结果">
+                <List
+                  dataSource={intersectionAddress}
+                  locale={''}
+                  renderItem={(poi) => (
+                    <List.Item style={{ cursor: 'pointer' }}>
+                      <List.Item.Meta
+                        onMouseOver={() => setHover(poi)}
+                        onMouseOut={() => setHover(null)}
+                        onClick={() => setPath(poi)}
+                        title={poi.name}
+                        description={poi.address}
+                      />
+                    </List.Item>
+                  )}
                 />
               </Card>
-
-              <Card className="quick-meet__card" title="输入你们的目标场所" bordered={false}>
-                <Input
-                  placeholder="输入你们的目标场所"
-                  allowClear
-                  value={destination}
-                  onChange={(e) => {
-                    setDestination(e.target.value);
-                  }}
-                />
-              </Card>
-
-              {intersectionAddress.length > 0 && (
-                <Card className="quick-meet__card" title="搜索结果" bordered={false}>
-                  <List
-                    dataSource={intersectionAddress}
-                    locale={''}
-                    renderItem={(poi) => (
-                      <List.Item style={{ cursor: 'pointer' }}>
-                        <List.Item.Meta
-                          onMouseOver={() => setHover(poi)}
-                          onMouseOut={() => setHover(null)}
-                          onClick={() => setPath(poi)}
-                          title={poi.name}
-                          description={poi.address}
-                        />
-                      </List.Item>
-                    )}
-                  />
-                </Card>
-              )}
-            </Panel>
-          </Collapse>
+            )}
+          </div>
 
           <Row align="middle" className="quick-meet__row">
             <Col span={8}>
@@ -382,31 +475,79 @@ export default function App() {
           </Row>
 
           <Row align="middle" className="quick-meet__row">
-            <Col span={8}>选择公交换乘策略</Col>
+            <Col span={8}>是否展示所有搜索到的地址</Col>
             <Col span={12}>
-              {transferPolicy.length > 0 && (
-                <Select
-                  defaultValue={transferPolicy[0].value}
-                  style={{ width: 120 }}
-                  onChange={(v) => {
-                    setPolicy(v);
-                  }}
-                >
-                  {transferPolicy.map((p) => (
-                    <Option key={p.value} value={p.value}>
-                      {p.title}
-                    </Option>
-                  ))}
-                </Select>
-              )}
+              <Switch
+                checkedChildren="开启"
+                unCheckedChildren="关闭"
+                checked={isShowAllAddress}
+                onChange={(isCheck) => {
+                  setIsShowAllAddress(isCheck);
+                }}
+              />
             </Col>
           </Row>
 
-          <Button className="quick-meet__search-btn" type="primary" disabled={disabled} onClick={startSearching}>
+          <Button
+            className="quick-meet__search-btn"
+            loading={isLoading}
+            type="primary"
+            disabled={disabled}
+            onClick={startSearching}
+          >
             开始搜索
           </Button>
           <span className="quick-meet__paragraph--small">*调整以上的选项后需再次点击搜索</span>
+
+          {intersectionAddress.length > 0 && (
+            <Row align="middle" className="quick-meet__row">
+              <Col span={8}>选择公交换乘策略</Col>
+              <Col span={8}>
+                {transferPolicy.length > 0 && (
+                  <Select
+                    defaultValue={transferPolicy[0].value}
+                    style={{ width: 120 }}
+                    onChange={(v) => {
+                      policy.current = v;
+                      const tp = transferPolicy.filter((t) => Number(t.value) === Number(v));
+                      setPolicyTitle(tp[0].title);
+                    }}
+                  >
+                    {transferPolicy.map((p) => (
+                      <Option key={p.value} value={p.value}>
+                        {p.title}
+                      </Option>
+                    ))}
+                  </Select>
+                )}
+              </Col>
+              <Col span={8}>
+                <span className="quick-meet__paragraph--small">*切换策略后请重新点击绿色点标记</span>
+              </Col>
+            </Row>
+          )}
         </div>
+
+        {isShowAllAddress &&
+          allAddress.map((poi) => (
+            <Marker
+              key={poi.id + '_all_address'}
+              position={[poi.location.lng, poi.location.lat]}
+              style={{ opacity: '0.5' }}
+              children={<img width="19px" height="32px" src="//webapi.amap.com/theme/v1.3/markers/b/mark_bs.png" />}
+              label={
+                poi === hover
+                  ? {
+                      content: poi.name,
+                      direction: 'bottom',
+                    }
+                  : { content: '' }
+              }
+              zIndex={poi === hover ? 110 : 99}
+              onMouseOver={() => setHover(poi)}
+              onMouseOut={() => setHover(null)}
+            />
+          ))}
 
         {address.map((poi) => (
           <Marker
@@ -428,48 +569,81 @@ export default function App() {
           />
         ))}
 
-        {a.map((poi) => (
-          <Marker
-            key={poi.id}
-            position={[poi.location.lng, poi.location.lat]}
-            style={{ opacity: '0.4' }}
-            className="aaaaaa"
-            children={<img width="19px" height="32px" src="//webapi.amap.com/theme/v1.3/markers/b/mark_bs.png" />}
-            label={
-              poi === hover
-                ? {
-                    content: poi.name,
-                    direction: 'bottom',
-                  }
-                : { content: '' }
-            }
-            zIndex={poi === hover ? 110 : 100}
-            onMouseOver={() => setHover(poi)}
-            onMouseOut={() => setHover(null)}
-          />
-        ))}
-
-        {intersectionAddress.map((poi) => (
-          <Marker
-            icon={marker1}
-            offset={[-22, -40]}
-            key={poi.id}
-            position={[poi.location.lng, poi.location.lat]}
-            label={
-              poi === hover
-                ? {
-                    content: poi.name,
-                    direction: 'bottom',
-                  }
-                : { content: '' }
-            }
-            zIndex={poi === hover ? 110 : 100}
-            onMouseOver={() => setHover(poi)}
-            onMouseOut={() => setHover(null)}
-            onClick={() => setPath(poi)}
-          />
-        ))}
+        <IntersectionAddressFunc
+          intersectionAddress={intersectionAddress}
+          hover={hover}
+          setHover={setHover}
+          setPath={setPath}
+        />
       </Amap>
+      <Modal
+        visible={isShowFinal}
+        destroyOnClose={true}
+        title={<div>路径规划</div>}
+        onCancel={() => {
+          setIsShowFinal(false);
+        }}
+        footer={[
+          <Button
+            type="primary"
+            onClick={() => {
+              setIsShowFinal(false);
+            }}
+          >
+            关闭
+          </Button>,
+        ]}
+      >
+        <div>
+          目的地：<span>{currentSelectAddress}</span>
+        </div>
+        <div>当前公交换乘策略：{policyTitle}</div>
+
+        {currentRoutePlan.length > 0 && (
+          <List
+            itemLayout="horizontal"
+            dataSource={currentRoutePlan}
+            renderItem={(routePlan) => (
+              <List.Item>
+                <List.Item.Meta
+                  title={
+                    <div className="quick-meet__route-plan-start">
+                      起点：{routePlan.start.name}{' '}
+                      <span
+                        onClick={(e) => {
+                          e.preventDefault();
+                          routePlan.tf.searchOnAMAP({
+                            origin: routePlan.result.origin,
+                            destination: routePlan.result.destination,
+                          });
+                        }}
+                        style={{ marginLeft: '10px', color: '#108ee9', fontWeight: '400', cursor: 'pointer' }}
+                      >
+                        点击唤起高德地图客户端
+                      </span>
+                    </div>
+                  }
+                  description={
+                    <div className="quick-meet__route-plan-result">
+                      {routePlan.result && routePlan.result.plans && (
+                        <div className="quick-meet__route-plan-taxi-cost">
+                          公交花费大约：￥{routePlan.result.plans[0].cost}，
+                          {secondToDate(routePlan.result.plans[0].time)}
+                        </div>
+                      )}
+                      {routePlan.result && (
+                        <div className="quick-meet__route-plan-taxi-cost">
+                          打车花费大约：￥{routePlan.result.taxi_cost}
+                        </div>
+                      )}
+                    </div>
+                  }
+                />
+              </List.Item>
+            )}
+          />
+        )}
+      </Modal>
     </div>
   );
 }

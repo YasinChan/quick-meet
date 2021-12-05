@@ -39,10 +39,33 @@ body,
   overflow: auto;
   background: #fff;
 }
+.quick-meet__card-header {
+  padding: 12px 24px;
+  border-bottom: 2px solid rgba(0,0,0,0.2);
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  justify-content: space-between;
+}
+.quick-meet__card-header--active .quick-meet__card-header-icon {
+  transform: rotate(0deg);
+}
+
+.quick-meet__card-header-icon {
+  transform: rotate(90deg);
+}
+
+.quick-meet__card-header-title {
+  font-size: 18px;
+  font-weight: bold;
+}
+
+.quick-meet__card-info--active {
+  display: none;
+}
 
 .quick-meet__card {
   width: 100%;
-  margin-bottom: 20px !important;
 }
 
 .quick-meet__add-address {
@@ -74,6 +97,6 @@ body,
 
 @media only screen and (max-width: 499px) {
   .quick-meet__card-wrap {
-    width: calc(100% - 20px);
+    width: calc(100% - 50px);
   }
 }
