@@ -57,9 +57,15 @@ export default function App() {
   const [activeKey, setActiveKey] = useState(['1']); // 折叠面板中需要展开的部分
   const [transferPolicy, setTransferPolicy] = useState([]); // 公交换乘策略 map
 
-  const AMap = usePlugins(['AMap.PlaceSearch', 'AMap.GeometryUtil', 'AMap.Circle', 'AMap.Transfer']);
+  const AMap = usePlugins(['AMap.CallAMap', 'AMap.PlaceSearch', 'AMap.GeometryUtil', 'AMap.Circle', 'AMap.Transfer']);
   const $map = useRef(null);
 
+  const ac = useMemo(() => {
+    if (AMap) {
+      // 抓取了源码发现了这个方法，起到和 v1.4 中的 searchOnAMAP 方法类似的效果
+      return new AMap.CallAMap();
+    }
+  }, [AMap]);
   const ps = useMemo(() => {
     // 搜索
     if (AMap) {
@@ -612,9 +618,11 @@ export default function App() {
                       <span
                         onClick={(e) => {
                           e.preventDefault();
-                          routePlan.tf.searchOnAMAP({
+                          ac.transferOnAMAP({
                             origin: routePlan.result.origin,
+                            originName: routePlan.start.name,
                             destination: routePlan.result.destination,
+                            destinationName: routePlan.end.name,
                           });
                         }}
                         style={{ marginLeft: '10px', color: '#108ee9', fontWeight: '400', cursor: 'pointer' }}
