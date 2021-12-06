@@ -17,8 +17,8 @@
 
 基于 [AMap-React](https://jimnox.gitee.io/amap-react/) ，一款由 [AMap](https://amap.com/) 官方集成了[高德地图 API](https://lbs.amap.com/api/jsapi-v2/summary/) 与 React 的地图框架，配合 UI 库 [ant design](https://ant.design/index-cn)，完成了以上构想。
 
-## 使用方式
+## 开发方式
 
-查看 .env.example 文件，需要从高德地图控制台免费[创建新的 key ](https://console.amap.com/dev/key/app)，本地创建 .env 文件按 example 配置两个字段，另外还需要配置 nginx 转发规则。
+拉取代码后，请查看 .env.example 文件，需要从高德地图控制台免费[创建新的 key ](https://console.amap.com/dev/key/app)，本地创建 .env 文件按 example 配置两个字段，另外还需要配置 nginx 转发规则。
 
 [MIT License](https://opensource.org/licenses/MIT)
