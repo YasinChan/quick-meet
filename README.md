@@ -21,4 +21,6 @@
 
 拉取代码后，请查看 .env.example 文件，需要从高德地图控制台免费[创建新的 key ](https://console.amap.com/dev/key/app)，本地创建 .env 文件按 example 配置两个字段，另外还需要配置 nginx 转发规则，细节请查看[官方文档](https://lbs.amap.com/api/jsapi-v2/guide/abc/prepare)。
 
+欢迎 PR 和提 issues~
+
 [MIT License](https://opensource.org/licenses/MIT)
