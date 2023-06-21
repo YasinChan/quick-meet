@@ -1,6 +1,6 @@
 # quick meet
 
-> 一个可以快速找到聚会地点的[网站](https://yasinchan.com/quick-meet/)。
+> 一个可以快速找到聚会地点的[网站](https://qm.yasinchan.com/)。
 
 ## 灵感来源
 
