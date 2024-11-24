@@ -2,7 +2,9 @@
 
 > 一个可以快速找到聚会地点的[网站](https://qm.yasinchan.com/)。
 
-## 小程序版本「快见」已发布，欢迎搜索体验！
+## 小程序版本「快见」已发布，欢迎扫码体验！
+
+![pic](https://file.yasinchan.com/y5lADKfOvXQD909wMUojrqPXPS8slvCh/%E4%B8%8B%E8%BD%BD.png)
 
 ## 灵感来源
 
